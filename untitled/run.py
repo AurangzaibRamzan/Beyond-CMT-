@@ -12,12 +12,12 @@ from multiprocessing.dummy import Pool as Threadpool
 import CMT
 import numpy as np
 
-import CMT2
+#import CMT2
 import util
 from functools import partial
 
-CMT = CMT.CMT()
-CMT2 = CMT2.CMT2()
+CMT =[CMT.CMT(),CMT.CMT()]
+#CMT2 = CMT2.CMT2()
 
 parser = argparse.ArgumentParser(description='Track an object.')
 
@@ -35,8 +35,8 @@ parser.add_argument('--skip', dest='skip', action='store', default=None, help='S
 
 args = parser.parse_args()
 
-CMT.estimate_scale = args.estimate_scale
-CMT.estimate_rotation = args.estimate_rotation
+CMT[0].estimate_scale = args.estimate_scale
+CMT[0].estimate_rotation = args.estimate_rotation
 
 
 keyPoints1=[]
@@ -176,10 +176,10 @@ temp_br = c,((d-b)/2)+b
 print 'using', tl, br, 'as init bb'
 
 
-CMT.initialise(im_gray0, tl, br)
-CMT2.initialise(im_gray0,temp_tl,temp_br)
+CMT[0].initialise(im_gray0, tl, br)
+CMT[1].initialise(im_gray0,temp_tl,temp_br)
 
-def foo():
+def foo(tl,br):
 
 
 
@@ -189,44 +189,49 @@ def foo():
 
         # Read image
         status, im = cap.read()
+        #if frame >1:
+        #   im = im[tl[1]-50:br[1]+50, tl[0]-50:br[0]+50]  # Crop from x, y, w, h -> 100, 200, 300, 400
 
+        # NOTE: its img[y: y + h, x: x + w] and *not* img[x: x + w, y: y + h]
+        #cv2.imshow("cropped",im)
+        #cv2.waitKey(0)
         if not status:
             break
         im_gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         im_draw = np.copy(im)
 
         tic = time.time()
-        CMT.process_frame(im_gray)
+        CMT[0].process_frame(im_gray)
         toc = time.time()
 
         tic2=time.time()
-        CMT2.process_frame(im_gray)
+        CMT[1].process_frame(im_gray)
         toc=time.time()
         # Display results
 
         # Draw updated estimate
-        if CMT.has_result:
+        if CMT[0].has_result:
 
-            cv2.line(im_draw, CMT.tl, CMT.tr, (255, 0, 0), 4)
-            cv2.line(im_draw, CMT.tr, CMT.br, (255, 0, 0), 4)
-            cv2.line(im_draw, CMT.br, CMT.bl, (255, 0, 0), 4)
-            cv2.line(im_draw, CMT.bl, CMT.tl, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[0].tl, CMT[0].tr, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[0].tr, CMT[0].br, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[0].br, CMT[0].bl, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[0].bl, CMT[0].tl, (255, 0, 0), 4)
 
-        if CMT2.has_result:
-            cv2.line(im_draw, CMT2.tl, CMT2.tr, (255, 0, 0), 4)
-            cv2.line(im_draw, CMT2.tr, CMT2.br, (255, 0, 0), 4)
-            cv2.line(im_draw, CMT2.br, CMT2.bl, (255, 0, 0), 4)
-            cv2.line(im_draw, CMT2.bl, CMT2.tl, (255, 0, 0), 4)
+        if CMT[1].has_result:
+            cv2.line(im_draw, CMT[1].tl, CMT[1].tr, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[1].tr, CMT[1].br, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[1].br, CMT[1].bl, (255, 0, 0), 4)
+            cv2.line(im_draw, CMT[1].bl, CMT[1].tl, (255, 0, 0), 4)
 
-        util.draw_keypoints(CMT.tracked_keypoints, im_draw, (255, 255, 255))
+        util.draw_keypoints(CMT[0].tracked_keypoints, im_draw, (255, 255, 255))
         # this is from simplescale
-        util.draw_keypoints(CMT.votes[:, :2], im_draw)  # blue
-        util.draw_keypoints(CMT.outliers[:, :2], im_draw, (0, 0, 255))
+        util.draw_keypoints(CMT[0].votes[:, :2], im_draw)  # blue
+        util.draw_keypoints(CMT[0].outliers[:, :2], im_draw, (0, 0, 255))
 
-        util.draw_keypoints(CMT2.tracked_keypoints, im_draw, (255, 255, 255))
+        util.draw_keypoints(CMT[1].tracked_keypoints, im_draw, (255, 255, 255))
         # this is from simplescale
-        util.draw_keypoints(CMT2.votes[:, :2], im_draw)  # blue
-        util.draw_keypoints(CMT2.outliers[:, :2], im_draw, (0, 0, 255))
+        util.draw_keypoints(CMT[1].votes[:, :2], im_draw)  # blue
+        util.draw_keypoints(CMT[1].outliers[:, :2], im_draw, (0, 0, 255))
 
         if args.output is not None:
             # Original image
@@ -237,27 +242,27 @@ def foo():
             # Keypoints
             with open('{0}/keypoints_{1:08d}.csv'.format(args.output, frame), 'w') as f:
                 f.write('x y\n')
-                np.savetxt(f, CMT.tracked_keypoints[:, :2], fmt='%.2f')
-                np.savetxt(f, CMT2.tracked_keypoints[:, :2], fmt='%.2f')
+                np.savetxt(f, CMT[0].tracked_keypoints[:, :2], fmt='%.2f')
+                np.savetxt(f, CMT[1].tracked_keypoints[:, :2], fmt='%.2f')
 
             # Outlier
             with open('{0}/outliers_{1:08d}.csv'.format(args.output, frame), 'w') as f:
                 f.write('x y\n')
-                np.savetxt(f, CMT.outliers, fmt='%.2f')
-                np.savetxt(f, CMT2.outliers, fmt='%.2f')
+                np.savetxt(f, CMT[0].outliers, fmt='%.2f')
+                np.savetxt(f, CMT[1].outliers, fmt='%.2f')
 
             # Votes
             with open('{0}/votes_{1:08d}.csv'.format(args.output, frame), 'w') as f:
                 f.write('x y\n')
-                np.savetxt(f, CMT.votes, fmt='%.2f')
-                np.savetxt(f, CMT2.votes, fmt='%.2f')
+                np.savetxt(f, CMT[0].votes, fmt='%.2f')
+                np.savetxt(f, CMT[1].votes, fmt='%.2f')
 
             # Bounding box
             with open('{0}/bbox_{1:08d}.csv'.format(args.output, frame), 'w') as f:
                 f.write('x y\n')
                 # Duplicate entry tl is not a mistake, as it is used as a drawing instruction
-                np.savetxt(f, np.array((CMT.tl, CMT.tr, CMT.br, CMT.bl, CMT.tl)), fmt='%.2f')
-                np.savetxt(f, np.array((CMT2.tl, CMT2.tr, CMT2.br, CMT2.bl, CMT2.tl)), fmt='%.2f')
+                np.savetxt(f, np.array((CMT[0].tl, CMT[0].tr, CMT[0].br, CMT[0].bl, CMT[0].tl)), fmt='%.2f')
+                np.savetxt(f, np.array((CMT[1].tl, CMT[1].tr, CMT[1].br, CMT[1].bl, CMT[1].tl)), fmt='%.2f')
 
         if not args.quiet:
             cv2.imshow('main', im_draw)
@@ -276,7 +281,7 @@ def foo():
         # Advance frame number
         frame += 1
 
-        print '{5:04d}: center: {0:.2f},{1:.2f} scale: {2:.2f}, active: {3:03d}, {4:04.0f}ms'.format(CMT.center[0], CMT.center[1], CMT.scale_estimate, CMT.active_keypoints.shape[0], 1000 * (toc - tic), frame)
+        print '{5:04d}: center: {0:.2f},{1:.2f} scale: {2:.2f}, active: {3:03d}, {4:04.0f}ms'.format(CMT[0].center[0], CMT[0].center[1], CMT[0].scale_estimate, CMT[0].active_keypoints.shape[0], 1000 * (toc - tic), frame)
 
 
 #pool=Threadpool(2)
@@ -287,4 +292,4 @@ def foo():
 #pool.close()
 #pool.join()
 
-foo()
+foo(tl,br)
